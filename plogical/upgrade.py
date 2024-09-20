@@ -18,7 +18,7 @@ import random
 import string
 
 VERSION = '2.3'
-BUILD = 6
+BUILD = 7
 
 CENTOS7 = 0
 CENTOS8 = 1
@@ -3436,6 +3436,7 @@ pm.max_spare_servers = 3
         Upgrade.setupCLI()
         Upgrade.someDirectories()
         Upgrade.installLSCPD(branch)
+        Upgrade.FixCurrentQuoatasSystem()
 
         ### General migrations are not needed any more
 
@@ -3516,6 +3517,204 @@ pm.max_spare_servers = 3
             time.sleep(30)
             if os.path.exists(Upgrade.LogPathNew):
                 os.remove(Upgrade.LogPathNew)
+
+    @staticmethod
+    def installQuota():
+        try:
+
+            if Upgrade.FindOperatingSytem() == CENTOS7 or Upgrade.FindOperatingSytem() == CENTOS8\
+                    or Upgrade.FindOperatingSytem() == openEuler20 or Upgrade.FindOperatingSytem() == openEuler22:
+                command = "yum install quota -y"
+                Upgrade.executioner(command, command, 0, True)
+
+                if Upgrade.edit_fstab('/', '/') == 0:
+                    print("Quotas will not be abled as we failed to modify fstab file.")
+                    return 0
+
+
+                command = 'mount -o remount /'
+                Upgrade.executioner(command, command, 0, True)
+
+                command = 'mount -o remount /'
+                mResult = subprocess.run(command, capture_output=True, text=True, shell=True)
+                if mResult.returncode != 0:
+                    fstab_path = '/etc/fstab'
+                    backup_path = fstab_path + '.bak'
+                    if os.path.exists(fstab_path):
+                        os.remove(fstab_path)
+                    shutil.copy(backup_path, fstab_path)
+
+                    print("Re-mount failed, restoring original FSTab and existing quota setup.")
+                    return 0
+
+
+
+            ##
+
+            if Upgrade.FindOperatingSytem() == Ubuntu22 or Upgrade.FindOperatingSytem() == Ubuntu18 \
+                    or Upgrade.FindOperatingSytem() == Ubuntu20:
+                print("Install Quota on Ubuntu")
+                command = 'apt update -y'
+                Upgrade.executioner(command, command, 0, True)
+
+                command = 'apt install quota -y'
+                Upgrade.executioner(command, command, 0, True)
+
+                command = "find /lib/modules/ -type f -name '*quota_v*.ko*'"
+
+
+                if subprocess.check_output(command,shell=True).decode("utf-8").find("quota/") == -1:
+                    command = "sudo apt install linux-image-extra-virtual -y"
+                    Upgrade.executioner(command, command, 0, True)
+
+                if Upgrade.edit_fstab('/', '/') == 0:
+                    print("Quotas will not be abled as we are are failed to modify fstab file.")
+                    return 0
+
+                command = 'mount -o remount /'
+                mResult = subprocess.run(command, capture_output=True, text=True, shell=True)
+                if mResult.returncode != 0:
+                    fstab_path = '/etc/fstab'
+                    backup_path = fstab_path + '.bak'
+                    if os.path.exists(fstab_path):
+                        os.remove(fstab_path)
+                    shutil.copy(backup_path, fstab_path)
+
+                    print("Re-mount failed, restoring original FSTab and existing quota setup.")
+                    return 0
+
+                command = 'quotacheck -ugm /'
+                Upgrade.executioner(command, command, 0, True)
+
+                ####
+
+                command = "find /lib/modules/ -type f -name '*quota_v*.ko*'"
+                iResult = subprocess.run(command, capture_output=True, text=True, shell=True)
+                print(repr(iResult.stdout))
+
+                # Only if the first command works, run the rest
+
+                if iResult.returncode == 0:
+                    command = "echo '{}' | sed -n 's|/lib/modules/\\([^/]*\\)/.*|\\1|p' | sort -u".format(iResult.stdout)
+                    result = subprocess.run(command, capture_output=True, text=True, shell=True)
+                    fResult = result.stdout.rstrip('\n')
+                    print(repr(result.stdout.rstrip('\n')))
+
+                    command  = 'uname -r'
+                    ffResult = subprocess.run(command, capture_output=True, text=True, shell=True)
+                    ffResult = ffResult.stdout.rstrip('\n')
+
+                    command = f"apt-get install linux-modules-extra-{ffResult}"
+                    Upgrade.executioner(command, command, 0, True)
+
+                ###
+
+                    command = f'modprobe quota_v1 -S {ffResult}'
+                    Upgrade.executioner(command, command, 0, True)
+
+                    command = f'modprobe quota_v2 -S {ffResult}'
+                    Upgrade.executioner(command, command, 0, True)
+
+            command = f'quotacheck -ugm /'
+            Upgrade.executioner(command, command, 0, True)
+
+            command = f'quotaon -v /'
+            Upgrade.executioner(command, command, 0, True)
+
+            return 1
+
+        except BaseException as msg:
+            print("[ERROR] installQuota. " + str(msg))
+            return 0
+
+    @staticmethod
+    def edit_fstab(mount_point, options_to_add):
+        try:
+            retValue = 1
+            # Backup the original fstab file
+            fstab_path = '/etc/fstab'
+            backup_path = fstab_path + '.bak'
+
+            rData = open(fstab_path, 'r').read()
+
+            if rData.find('xfs') > -1:
+                options_to_add = 'uquota'
+            else:
+                options_to_add = 'usrquota,grpquota'
+
+            if not os.path.exists(backup_path):
+                shutil.copy(fstab_path, backup_path)
+
+            # Read the fstab file
+            with open(fstab_path, 'r') as file:
+                lines = file.readlines()
+
+            # Modify the appropriate line
+            WriteToFile = open(fstab_path, 'w')
+            for i, line in enumerate(lines):
+
+                if line.find('\t') > -1:
+                    parts = line.split('\t')
+                else:
+                    parts = line.split(' ')
+
+                print(parts)
+                try:
+                    if parts[1] == '/' and parts[3].find(options_to_add) == -1 and len(parts[3]) > 4:
+
+                        parts[3] = f'{parts[3]},{options_to_add}'
+                        tempParts = [item for item in parts if item.strip()]
+                        finalString = '\t'.join(tempParts)
+                        print(finalString)
+                        WriteToFile.write(finalString)
+
+                    elif parts[1] == '/':
+
+                        for ii, p in enumerate(parts):
+                            if p.find('defaults') > -1 or p.find('discard') > -1:
+                                parts[ii] = f'{parts[ii]},{options_to_add}'
+                                tempParts = [item for item in parts if item.strip()]
+                                finalString = '\t'.join(tempParts)
+                                print(finalString)
+                                WriteToFile.write(finalString)
+                    else:
+                        WriteToFile.write(line)
+                except:
+                    WriteToFile.write(line)
+
+            WriteToFile.close()
+
+            return retValue
+        except:
+            return 0
+
+
+    @staticmethod
+    def FixCurrentQuoatasSystem():
+        fstab_path = '/etc/fstab'
+
+        data = open(fstab_path, 'r').read()
+
+        if data.find("usrquota,grpquota") > -1 or data.find("uquota") > -1:
+            print("Quotas already enabled.")
+
+
+        if Upgrade.installQuota() == 1:
+
+            print("We will attempt to bring new Quota system to old websites.")
+            from websiteFunctions.models import Websites
+            for website in Websites.objects.all():
+
+                command = 'chattr -R -i /home/%s/' % (website.domain)
+                Upgrade.executioner(command, command, 0, True)
+
+                if website.package.enforceDiskLimits:
+                    spaceString = f'{website.package.diskSpace}M {website.package.diskSpace}M'
+                    command = f'setquota -u {website.externalApp} {spaceString} 0 0 /'
+                    Upgrade.executioner(command, command, 0, True)
+
+        else:
+            print("Quotas can not be enabled continue to use chhtr.")
 
 
 def main():
