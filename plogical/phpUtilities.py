@@ -236,20 +236,24 @@ class phpUtilities:
         finalConfPath = ApacheVhost.configBasePath + domainName + '.conf'
         if os.path.exists(finalConfPath):
             command = f'grep -Eo -m 1 "php[0-9]+" {finalConfPath} | sed -n "1p"'
-            result = ProcessUtilities.outputExecutioner(command, None, True).rstrip('\n')
+            php_version = ProcessUtilities.outputExecutioner(command, None, True).rstrip('\n')
 
             # Input string
-            php_version = "php73"
+            #php_version = "php73"
 
-            # Insert a period between '7' and '3' to convert it to 'php7.3'
-            converted_version = php_version[:4] + '.' + php_version[4:]
+            if ProcessUtilities.decideDistro() == ProcessUtilities.centos or ProcessUtilities.decideDistro() == ProcessUtilities.cent8:
+                command = f'/opt/remi/{php_version}/root/bin/php'
+                return command
+            else:
+                # Insert a period between '7' and '3' to convert it to 'php7.3'
+                converted_version = php_version[:4] + '.' + php_version[4:]
 
-            # Output the result
-            print(converted_version)
+                # Output the result
+                print(converted_version)
 
-            result = f'/usr/bin/{converted_version}'
-            #result = result.rsplit("lsphp", 1)[0] + "php"
-            return result
+                result = f'/usr/bin/{converted_version}'
+                #result = result.rsplit("lsphp", 1)[0] + "php"
+                return result
 
         if os.path.exists('/usr/local/CyberCP/debug'):
             logging.CyberCPLogFileWriter.writeToFile(f'VHFile in GetPHPVersion {vhFile}')
@@ -277,7 +281,8 @@ class phpUtilities:
             logging.CyberCPLogFileWriter.writeToFile(result)
 
         command = result + " -v 2>/dev/null | awk '/^PHP/ {print $2}'"
-        php_version = ProcessUtilities.outputExecutioner(command, None, True).rstrip('\n')
+        php_version = ProcessUtilities.outputExecutioner(command, None, True).rstrip('\n')[:3]
+
         return f"PHP {php_version}"
 
     @staticmethod
