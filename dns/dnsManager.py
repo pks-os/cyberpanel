@@ -618,6 +618,25 @@ class DNSManager:
             writeToFile.write(nsContent.rstrip('\n'))
             writeToFile.close()
 
+            ###
+
+            import tldextract
+
+            no_cache_extract = tldextract.TLDExtract(cache_dir=None)
+
+
+
+            nsData = open(DNSManager.defaultNameServersPath, 'r').readlines()
+
+            for ns in nsData:
+                extractDomain = no_cache_extract(ns.rstrip('\n'))
+                topLevelDomain = extractDomain.domain + '.' + extractDomain.suffix
+
+                zone = Domains.objects.get(name=topLevelDomain)
+
+                DNS.createDNSRecord(zone, ns, 'A', ACLManager.fetchIP(), 0, 1400)
+
+
 
             final_dic = {'status': 1, 'error_message': "None"}
             final_json = json.dumps(final_dic)
@@ -710,7 +729,7 @@ class DNSManager:
 
             try:
                 zones = cf.zones.get(params=params)
-            except CloudFlare.CloudFlareAPIError as e:
+            except BaseException as e:
                 final_json = json.dumps({'status': 0, 'fetchStatus': 0, 'error_message': str(e), "data": '[]'})
                 return HttpResponse(final_json)
 
@@ -749,7 +768,7 @@ class DNSManager:
 
                 try:
                     dns_records = cf.zones.dns_records.get(zone_id, params={'per_page':50, 'type':fetchType})
-                except CloudFlare.exceptions.CloudFlareAPIError as e:
+                except BaseException as e:
                     final_json = json.dumps({'status': 0, 'fetchStatus': 0, 'error_message': str(e), "data": '[]'})
                     return HttpResponse(final_json)
 
@@ -816,7 +835,7 @@ class DNSManager:
 
             try:
                 zones = cf.zones.get(params=params)
-            except CloudFlare.CloudFlareAPIError as e:
+            except BaseException as e:
                 final_json = json.dumps({'status': 0, 'delete_status': 0, 'error_message': str(e), "data": '[]'})
                 return HttpResponse(final_json)
 
@@ -868,7 +887,7 @@ class DNSManager:
 
             try:
                 zones = cf.zones.get(params=params)
-            except CloudFlare.CloudFlareAPIError as e:
+            except BaseException as e:
                 final_json = json.dumps({'status': 0, 'delete_status': 0, 'error_message': str(e), "data": '[]'})
                 return HttpResponse(final_json)
 
