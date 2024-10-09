@@ -94,20 +94,20 @@ class virtualHostUtilities:
         ### if skipRDNSCheck == 1, it means we need to skip checking for rDNS
         if skipRDNSCheck:
             ### so if skipRDNSCheck is 1 means we need to skip checking for rDNS so lets set current as rDNS because no checking is required
-            rDNS = CurrentHostName
+            rDNS = [CurrentHostName]
         else:
             rDNS = mailUtilities.reverse_dns_lookup(serverIP)
 
         time.sleep(3)
 
         if os.path.exists(ProcessUtilities.debugPath):
-            print(f'Postfix Hostname: {PostFixHostname}. Server IP {serverIP}. rDNS: {rDNS}')
-            logging.CyberCPLogFileWriter.writeToFile(f'Postfix Hostname: {PostFixHostname}. Server IP {serverIP}. rDNS: {rDNS}, rDNS check {skipRDNSCheck}')
+            print(f'Postfix Hostname: {PostFixHostname}. Server IP {serverIP}. rDNS: {str(rDNS)}')
+            logging.CyberCPLogFileWriter.writeToFile(f'Postfix Hostname: {PostFixHostname}. Server IP {serverIP}. rDNS: {str(rDNS)}, rDNS check {skipRDNSCheck}')
 
         ### Case 1 if hostname already exists check if same hostname in postfix and rdns
         filePath = '/etc/letsencrypt/live/%s/fullchain.pem' % (PostFixHostname)
 
-        if (CurrentHostName == PostFixHostname and CurrentHostName == rDNS) and os.path.exists(filePath):
+        if (CurrentHostName == PostFixHostname and CurrentHostName in rDNS) and os.path.exists(filePath):
 
             # expireData = x509.get_notAfter().decode('ascii')
             # finalDate = datetime.strptime(expireData, '%Y%m%d%H%M%SZ')
@@ -222,16 +222,16 @@ class virtualHostUtilities:
             ### if skipRDNSCheck == 1, it means we need to skip checking for rDNS
             if skipRDNSCheck:
                 ### so if skipRDNSCheck is 1 means we need to skip checking for rDNS so lets set current domain as rDNS because no checking is required
-                rDNS = Domain
+                rDNS = [Domain]
 
             if os.path.exists(ProcessUtilities.debugPath):
                 logging.CyberCPLogFileWriter.writeToFile(
-                    f'Second if: Postfix Hostname: {PostFixHostname}. Server IP {serverIP}. rDNS: {rDNS}, rDNS check {skipRDNSCheck}')
+                    f'Second if: Postfix Hostname: {PostFixHostname}. Server IP {serverIP}. rDNS: {str(rDNS)}, rDNS check {skipRDNSCheck}')
 
             #first check if hostname is already configured as rDNS, if not return error
 
 
-            if Domain != rDNS:
+            if Domain not in rDNS:
                 message = 'Domain that you have provided is not configured as rDNS for your server IP. [404]'
                 print(message)
                 logging.CyberCPLogFileWriter.statusWriter(tempStatusPath, message)
@@ -370,6 +370,58 @@ local_name %s {
 
                 command = 'systemctl restart postfix'
                 ProcessUtilities.executioner(command)
+
+        ### even if mail domain creation is not set, we will have to set up auto discover for main domain
+
+        dovecotPath = '/etc/dovecot/dovecot.conf'
+
+        if os.path.exists(dovecotPath):
+            dovecotContent = open(dovecotPath, 'r').read()
+
+            if dovecotContent.find('/live/%s/' % (virtualHostName)) == -1:
+                content = """
+local_name %s {
+        ssl_cert = </etc/letsencrypt/live/%s/fullchain.pem
+        ssl_key = </etc/letsencrypt/live/%s/privkey.pem
+}
+""" % (virtualHostName, virtualHostName, virtualHostName)
+
+                writeToFile = open(dovecotPath, 'a')
+                writeToFile.write(content)
+                writeToFile.close()
+
+            command = 'systemctl restart dovecot'
+            ProcessUtilities.executioner(command)
+
+            ### Update postfix configurations
+
+            postFixPath = '/etc/postfix/main.cf'
+
+            postFixContent = open(postFixPath, 'r').read()
+
+            if postFixContent.find('tls_server_sni_maps') == -1:
+                writeToFile = open(postFixPath, 'a')
+                writeToFile.write('\ntls_server_sni_maps = hash:/etc/postfix/vmail_ssl.map\n')
+                writeToFile.close()
+
+            postfixMapFile = '/etc/postfix/vmail_ssl.map'
+            try:
+                postfixMapFileContent = open(postfixMapFile, 'r').read()
+            except:
+                postfixMapFileContent = ''
+
+            if postfixMapFileContent.find('/live/%s/' % (virtualHostName)) == -1:
+                mapContent = f'{virtualHostName} /etc/letsencrypt/live/{virtualHostName}/privkey.pem /etc/letsencrypt/live/{virtualHostName}/fullchain.pem\n'
+                writeToFile = open(postfixMapFile, 'a')
+                writeToFile.write(mapContent)
+                writeToFile.close()
+
+            command = 'postmap -F hash:/etc/postfix/vmail_ssl.map'
+
+            ProcessUtilities.executioner(command)
+
+            command = 'systemctl restart postfix'
+            ProcessUtilities.executioner(command)
 
     @staticmethod
     def createVirtualHost(virtualHostName, administratorEmail, phpVersion, virtualHostUser, ssl,
