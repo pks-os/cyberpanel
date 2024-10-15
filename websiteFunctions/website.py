@@ -99,6 +99,10 @@ class WebsiteManager:
             currentACL = ACLManager.loadedACL(userID)
             adminNames = ACLManager.loadAllUsers(userID)
             packagesName = ACLManager.loadPackages(userID, currentACL)
+
+            if len(packagesName) == 0:
+                packagesName = ['Default']
+
             FinalVersions = []
             userobj = Administrator.objects.get(pk=userID)
             counter = 0
@@ -126,7 +130,7 @@ class WebsiteManager:
             Data = {'packageList': packagesName, "owernList": adminNames, 'WPVersions': FinalVersions,
                     'Plugins': Plugins, 'Randam_String': rnpss.lower(), 'test_domain_data': test_domain_status}
             proc = httpProc(request, 'websiteFunctions/WPCreate.html',
-                            Data, 'createWebsite')
+                            Data, 'createDatabase')
             return proc.render()
         else:
             from django.shortcuts import reverse
@@ -203,14 +207,14 @@ class WebsiteManager:
                     da = str(msg)
 
                 proc = httpProc(request, 'websiteFunctions/WPsiteHome.html',
-                                Data, 'createWebsite')
+                                Data, 'createDatabase')
                 return proc.render()
             else:
                 from django.shortcuts import reverse
                 return redirect(reverse('pricing'))
         except:
             proc = httpProc(request, 'websiteFunctions/WPsiteHome.html',
-                            Data, 'createWebsite')
+                            Data, 'createDatabase')
             return proc.render()
 
     def RestoreHome(self, request=None, userID=None, BackupID=None):
@@ -242,7 +246,7 @@ class WebsiteManager:
                 Data['WPsites'] = ACLManager.GetALLWPObjects(currentACL, userID)
 
             proc = httpProc(request, 'websiteFunctions/WPRestoreHome.html',
-                            Data, 'createWebsite')
+                            Data, 'createDatabase')
             return proc.render()
         else:
             from django.shortcuts import reverse
@@ -291,7 +295,7 @@ class WebsiteManager:
                         })
 
             proc = httpProc(request, 'websiteFunctions/RemoteBackupConfig.html',
-                            Data, 'createWebsite')
+                            Data, 'createDatabase')
             return proc.render()
         else:
             from django.shortcuts import reverse
@@ -327,7 +331,7 @@ class WebsiteManager:
                     'LastRun': LastRun
                 })
             proc = httpProc(request, 'websiteFunctions/BackupfileConfig.html',
-                            Data, 'createWebsite')
+                            Data, 'createDatabase')
             return proc.render()
         else:
             from django.shortcuts import reverse
@@ -362,7 +366,7 @@ class WebsiteManager:
                 except:
                     pass
             proc = httpProc(request, 'websiteFunctions/AddRemoteBackupSite.html',
-                            Data, 'createWebsite')
+                            Data, 'createDatabase')
             return proc.render()
         else:
             from django.shortcuts import reverse
@@ -392,10 +396,10 @@ class WebsiteManager:
 
             backobj = WPSitesBackup.objects.filter(owner=admin).order_by('-id')
 
-            if ACLManager.CheckIPBackupObjectOwner(currentACL, backobj, admin) == 1:
-                pass
-            else:
-                return ACLManager.loadError()
+            # if ACLManager.CheckIPBackupObjectOwner(currentACL, backobj, admin) == 1:
+            #     pass
+            # else:
+            #     return ACLManager.loadError()
 
             try:
                 if DeleteID != None:
@@ -436,7 +440,7 @@ class WebsiteManager:
                 })
 
             proc = httpProc(request, 'websiteFunctions/RestoreBackups.html',
-                            Data, 'createWebsite')
+                            Data, 'createDatabase')
             return proc.render()
         else:
             from django.shortcuts import reverse
@@ -495,7 +499,7 @@ class WebsiteManager:
             data['password'] = password
 
             proc = httpProc(request, 'websiteFunctions/AutoLogin.html',
-                            data, 'createWebsite')
+                            data, 'createDatabase')
             return proc.render()
         else:
             from django.shortcuts import reverse
@@ -512,7 +516,7 @@ class WebsiteManager:
 
             Data = {'Selectedplugins': Selectedplugins, }
             proc = httpProc(request, 'websiteFunctions/WPConfigurePlugins.html',
-                            Data, 'createWebsite')
+                            Data, 'createDatabase')
             return proc.render()
         else:
             from django.shortcuts import reverse
@@ -528,7 +532,7 @@ class WebsiteManager:
 
             Data = {'packageList': packagesName, "owernList": adminNames, 'phps': phps}
             proc = httpProc(request, 'websiteFunctions/WPAddNewPlugin.html',
-                            Data, 'createWebsite')
+                            Data, 'createDatabase')
             return proc.render()
 
         return redirect(reverse('pricing'))
@@ -606,7 +610,7 @@ class WebsiteManager:
         Data['BucketName'] = pluginobj.Name
 
         proc = httpProc(request, 'websiteFunctions/WPEidtPlugin.html',
-                        Data, 'createWebsite')
+                        Data, 'createDatabase')
         return proc.render()
 
     def deletesPlgin(self, userID=None, data=None, ):

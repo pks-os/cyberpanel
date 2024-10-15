@@ -1914,6 +1914,9 @@ class ApplicationInstaller(multi.Thread):
             DataToPass['apacheBackend'] = self.extraArgs['apacheBackend']
             UserID = self.data['adminID']
 
+            if os.path.exists(ProcessUtilities.debugPath):
+                logging.writeToFile(f'Data passed to wordpressInstallNew is {str(DataToPass)}')
+
             try:
                 website = Websites.objects.get(domain=DataToPass['domainName'])
 
@@ -1921,16 +1924,29 @@ class ApplicationInstaller(multi.Thread):
                     website.phpSelection = 'PHP 8.0'
                     website.save()
 
-                if ACLManager.checkOwnership(website.domain, self.extraArgs['adminID'],
+                admin = Administrator.objects.get(pk=self.extraArgs['adminID'])
+
+                if ACLManager.checkOwnership(website.domain, admin,
                                              self.extraArgs['currentACL']) == 0:
                     statusFile = open(tempStatusPath, 'w')
                     statusFile.writelines('You dont own this site.[404]')
                     statusFile.close()
-            except:
+                    return 0
+            except BaseException as msg:
+
+                if os.path.exists(ProcessUtilities.debugPath):
+                    logging.writeToFile(f'Error in finding existing site in wordpressInstallNew is {str(msg)}')
 
                 ab = WebsiteManager()
                 coreResult = ab.submitWebsiteCreation(UserID, DataToPass)
                 coreResult1 = json.loads((coreResult).content)
+
+                if coreResult1['status'] == 0:
+                    statusFile = open(currentTemp, 'w')
+                    statusFile.writelines('Failed to Create Website: error: %s. [404]' % coreResult1['errorMessage'])
+                    statusFile.close()
+                    return 0
+
                 logging.writeToFile("Creating website result....%s" % coreResult1)
                 reutrntempath = coreResult1['tempStatusPath']
                 while (1):
@@ -6647,11 +6663,23 @@ class ApplicationInstaller(multi.Thread):
                 if errorRet:
                     logging.writeToFile(f"Error in scp command to retrieve backup {errorRet}")
                     statusFile = open(tempStatusPath, 'w')
-                    statusFile.writelines(f"Error in scp command to retrieve backup {errorRet} [404]")
+                    statusFile.writelines(f"Error in scp command to retrieve backup {errorRet}.")
                     statusFile.close()
-                    return 0
+
+                    try:
+                        sftp.get(f'cpbackups/{folder}/{backupfile}', f'/home/cyberpanel/{backupfile}',
+                                 callback=self.UpdateDownloadStatus)
+                    except BaseException as msg:
+                        logging.writeToFile(f"Failed to download file {str(msg)} [404]")
+                        statusFile = open(tempStatusPath, 'w')
+                        statusFile.writelines(f"Failed to download file {str(msg)} [404]")
+                        statusFile.close()
+                        return 0
+
                 else:
                     logging.writeToFile(f"Success in scp command to retrieve backup {successRet}")
+
+
 
             if sftp:
                 sftp.close()  # Close the SFTP session
