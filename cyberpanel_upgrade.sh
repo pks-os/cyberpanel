@@ -679,7 +679,7 @@ if [[ -f /usr/local/CyberCP/bin/python2 ]]; then
 elif [[ -d /usr/local/CyberCP/bin/ ]]; then
   echo -e "\nNo need to re-setup virtualenv at /usr/local/CyberCP...\n"
 else
-  virtualenv -p /usr/bin/python3 --system-site-packages /usr/local/CyberCP
+  virtualenv -p /usr/bin/python3 /usr/local/CyberCP
     Check_Return
 fi
 
@@ -697,7 +697,7 @@ else
   # shellcheck disable=SC1091
   source /usr/local/CyberCP/bin/activate
     Check_Return
-  $PIP3 install --default-timeout=3600 --ignore-installed -r /usr/local/requirments.txt
+  /usr/local/CyberCP/bin/pip3 install --default-timeout=3600 --ignore-installed -r /usr/local/requirments.txt
     Check_Return
 fi
 
