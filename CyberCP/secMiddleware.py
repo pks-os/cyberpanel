@@ -25,7 +25,7 @@ class secMiddleware:
         try:
             uID = request.session['userID']
             admin = Administrator.objects.get(pk=uID)
-            ipAddr = get_client_ip(request)
+            ipAddr = secMiddleware.get_client_ip(request)
 
             if ipAddr.find('.') > -1:
                 if request.session['ipAddr'] == ipAddr or admin.securityLevel == secMiddleware.LOW:
@@ -33,19 +33,19 @@ class secMiddleware:
                 else:
                     del request.session['userID']
                     del request.session['ipAddr']
-                    logging.writeToFile(get_client_ip(request))
+                    logging.writeToFile(secMiddleware.get_client_ip(request))
                     final_dic = {'error_message': "Session reuse detected, IPAddress logged.",
                                  "errorMessage": "Session reuse detected, IPAddress logged."}
                     final_json = json.dumps(final_dic)
                     return HttpResponse(final_json)
             else:
-                ipAddr = get_client_ip(request).split(':')[:3]
+                ipAddr = secMiddleware.get_client_ip(request).split(':')[:3]
                 if request.session['ipAddr'] == ipAddr or admin.securityLevel == secMiddleware.LOW:
                     pass
                 else:
                     del request.session['userID']
                     del request.session['ipAddr']
-                    logging.writeToFile(get_client_ip(request))
+                    logging.writeToFile(secMiddleware.get_client_ip(request))
                     final_dic = {'error_message': "Session reuse detected, IPAddress logged.",
                                  "errorMessage": "Session reuse detected, IPAddress logged."}
                     final_json = json.dumps(final_dic)
@@ -54,16 +54,25 @@ class secMiddleware:
             pass
 
         from plogical.processUtilities import ProcessUtilities
-
-        # if os.path.exists(ProcessUtilities.debugPath):
-        #     logging.writeToFile(request.build_absolute_uri())
-
         FinalURL = request.build_absolute_uri().split('?')[0]
+
+        if os.path.exists(ProcessUtilities.debugPath):
+            logging.writeToFile(request.build_absolute_uri())
+            logging.writeToFile(FinalURL)
+
+
+        if FinalURL == '/' or FinalURL == '/verifyLogin' or FinalURL == '/logout':
+            if os.path.exists(ProcessUtilities.debugPath):
+                logging.writeToFile(request.build_absolute_uri())
+
 
         # if os.path.exists(ProcessUtilities.debugPath):
         #     logging.writeToFile(f'Final actual URL without QS {FinalURL}')
 
-        if request.method == 'POST':
+        if os.path.exists(ProcessUtilities.debugPath):
+            logging.writeToFile(f'Request method {request.method.lower()}')
+
+        if request.method.lower() == 'post' or request.method.lower() == 'options':
             try:
 
                 # logging.writeToFile(request.body)
