@@ -35,7 +35,7 @@ class secMiddleware:
             logging.writeToFile(f'Path vs the final url : {pathActual}')
             logging.writeToFile(FinalURL)
 
-        if pathActual == '/' or pathActual == '/verifyLogin' or pathActual == '/logout' or pathActual.startswith('/api')\
+        if pathActual == "/backup/localInitiate" or  pathActual == '/' or pathActual == '/verifyLogin' or pathActual == '/logout' or pathActual.startswith('/api')\
                 or pathActual.endswith('/webhook') or pathActual.startswith('/cloudAPI') or pathActual.endswith('/gitNotify'):
             pass
         else:
@@ -94,6 +94,7 @@ class secMiddleware:
         except:
             pass
 
+
         if bool(request.body):
             try:
 
@@ -108,11 +109,21 @@ class secMiddleware:
                     data = request.POST
 
                 for key, value in data.items():
+                    valueAlreadyChecked = 0
+
+                    if os.path.exists(ProcessUtilities.debugPath):
+                        logging.writeToFile(f'Key being scanned {str(key)}')
+                        logging.writeToFile(f'Value being scanned {str(value)}')
+
                     if request.path.find('gitNotify') > -1:
                         break
+
                     if type(value) == str or type(value) == bytes:
                         pass
                     elif type(value) == list:
+                        valueAlreadyChecked = 1
+                        if os.path.exists(ProcessUtilities.debugPath):
+                            logging.writeToFile(f'Item type detected as list')
                         for items in value:
                             if items.find('- -') > -1 or items.find('\n') > -1 or items.find(';') > -1 or items.find(
                                     '&&') > -1 or items.find('|') > -1 or items.find('...') > -1 \
@@ -149,7 +160,7 @@ class secMiddleware:
                         'cloudAPI') > -1 or FinalURL.find(
                         'verifyLogin') > -1 or FinalURL.find('submitUserCreation') > -1:
                         continue
-                    if key == 'ownerPassword' or key == 'scriptUrl' or key == 'CLAMAV_VIRUS' or key == "Rspamdserver" or key == 'smtpd_milters' \
+                    if key == 'MainDashboardCSS' or key == 'ownerPassword' or key == 'scriptUrl' or key == 'CLAMAV_VIRUS' or key == "Rspamdserver" or key == 'smtpd_milters' \
                             or key == 'non_smtpd_milters' or key == 'key' or key == 'cert' or key == 'recordContentAAAA' or key == 'backupDestinations'\
                             or key == 'ports' \
                             or key == 'imageByPass' or key == 'passwordByPass' or key == 'PasswordByPass' or key == 'cronCommand' \
@@ -157,20 +168,22 @@ class secMiddleware:
                             or key == 'modSecRules' or key == 'recordContentTXT' or key == 'SecAuditLogRelevantStatus' \
                             or key == 'fileContent' or key == 'commands' or key == 'gitHost' or key == 'ipv6' or key == 'contentNow':
                         continue
-                    if value.find('- -') > -1 or value.find('\n') > -1 or value.find(';') > -1 or value.find(
-                            '&&') > -1 or value.find('|') > -1 or value.find('...') > -1 \
-                            or value.find("`") > -1 or value.find("$") > -1 or value.find("(") > -1 or value.find(
-                        ")") > -1 \
-                            or value.find("'") > -1 or value.find("[") > -1 or value.find("]") > -1 or value.find(
-                        "{") > -1 or value.find("}") > -1 \
-                            or value.find(":") > -1 or value.find("<") > -1 or value.find(">") > -1 or value.find(
-                        "&") > -1:
-                        logging.writeToFile(request.body)
-                        final_dic = {
-                            'error_message': "Data supplied is not accepted, following characters are not allowed in the input ` $ & ( ) [ ] { } ; : ‘ < >.",
-                            "errorMessage": "Data supplied is not accepted, following characters are not allowed in the input ` $ & ( ) [ ] { } ; : ‘ < >."}
-                        final_json = json.dumps(final_dic)
-                        return HttpResponse(final_json)
+
+                    if valueAlreadyChecked == 0:
+                        if value.find('- -') > -1 or value.find('\n') > -1 or value.find(';') > -1 or value.find(
+                                '&&') > -1 or value.find('|') > -1 or value.find('...') > -1 \
+                                or value.find("`") > -1 or value.find("$") > -1 or value.find("(") > -1 or value.find(
+                            ")") > -1 \
+                                or value.find("'") > -1 or value.find("[") > -1 or value.find("]") > -1 or value.find(
+                            "{") > -1 or value.find("}") > -1 \
+                                or value.find(":") > -1 or value.find("<") > -1 or value.find(">") > -1 or value.find(
+                            "&") > -1:
+                            logging.writeToFile(request.body)
+                            final_dic = {
+                                'error_message': "Data supplied is not accepted, following characters are not allowed in the input ` $ & ( ) [ ] { } ; : ‘ < >.",
+                                "errorMessage": "Data supplied is not accepted, following characters are not allowed in the input ` $ & ( ) [ ] { } ; : ‘ < >."}
+                            final_json = json.dumps(final_dic)
+                            return HttpResponse(final_json)
                     if key.find(';') > -1 or key.find('&&') > -1 or key.find('|') > -1 or key.find('...') > -1 \
                             or key.find("`") > -1 or key.find("$") > -1 or key.find("(") > -1 or key.find(")") > -1 \
                             or key.find("'") > -1 or key.find("[") > -1 or key.find("]") > -1 or key.find(
